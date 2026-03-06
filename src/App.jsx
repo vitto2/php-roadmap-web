@@ -423,6 +423,13 @@ const LEVEL_BG = {
 	avançado: "rgba(239,68,68,0.08)",
 };
 
+// ── Configuração automática via .env ─────────────────────────────────────────
+const DB_CONFIG = {
+	url: import.meta.env.VITE_SUPABASE_URL,
+	key: import.meta.env.VITE_SUPABASE_KEY,
+	userId: import.meta.env.VITE_USER_ID || "meu_progresso",
+};
+
 // ── Supabase REST helper ─────────────────────────────────────────────────────
 function makeClient(url, key) {
 	const h = {
@@ -456,507 +463,57 @@ function makeClient(url, key) {
 	};
 }
 
-// ── Setup modal ──────────────────────────────────────────────────────────────
-const SQL = `create table roadmap_progress (
-  id         uuid primary key default gen_random_uuid(),
-  user_id    text unique not null,
-  progress   jsonb not null default '{}',
-  updated_at timestamptz default now()
-);
-
-alter table roadmap_progress enable row level security;
-
-create policy "public_access" on roadmap_progress
-  for all using (true) with check (true);`;
-
-function SetupModal({ currentChecked, onConnect, onClose }) {
-	const [step, setStep] = useState(1);
-	const [url, setUrl] = useState("");
-	const [key, setKey] = useState("");
-	const [uid, setUid] = useState("meu_progresso");
-	const [busy, setBusy] = useState(false);
-	const [err, setErr] = useState("");
-	const [copied, setCopied] = useState(false);
-
-	async function connect() {
-		if (!url || !key) return setErr("Preencha a URL e a chave anon.");
-		setBusy(true);
-		setErr("");
-		try {
-			const client = makeClient(url.replace(/\/$/, ""), key);
-			// Try to save current progress immediately
-			await client.save(uid, currentChecked);
-			onConnect({ url: url.replace(/\/$/, ""), key, userId: uid });
-		} catch (e) {
-			setErr(
-				"Falha na conexão. Verifique URL, chave e se a tabela foi criada corretamente.",
-			);
-		} finally {
-			setBusy(false);
-		}
-	}
-
-	function copySQL() {
-		navigator.clipboard.writeText(SQL).then(() => {
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		});
-	}
-
-	return (
-		<div
-			style={ms.overlay}
-			onClick={(e) => e.target === e.currentTarget && onClose()}>
-			<div style={ms.box}>
-				{/* Header */}
-				<div style={ms.hdr}>
-					<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-						<span style={{ fontSize: 22 }}>⚡</span>
-						<div>
-							<div style={ms.title}>Conectar ao Supabase</div>
-							<div style={ms.sub}>
-								Banco PostgreSQL gratuito — progresso sincronizado em qualquer
-								dispositivo
-							</div>
-						</div>
-					</div>
-					<button style={ms.closeBtn} onClick={onClose}>
-						✕
-					</button>
-				</div>
-
-				{/* Step nav */}
-				<div style={ms.stepNav}>
-					{["Criar projeto", "Criar tabela", "Conectar"].map((label, i) => (
-						<div
-							key={i}
-							style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<div
-								style={{
-									...ms.dot,
-									background:
-										step > i + 1
-											? "#00ff88"
-											: step === i + 1
-												? "#00ff88"
-												: "#1e1e2e",
-									color: step >= i + 1 ? "#000" : "#555",
-								}}>
-								{step > i + 1 ? "✓" : i + 1}
-							</div>
-							<span
-								style={{
-									fontSize: 12,
-									color: step === i + 1 ? "#fff" : "#444",
-								}}>
-								{label}
-							</span>
-							{i < 2 && (
-								<span style={{ color: "#1e1e2e", margin: "0 6px" }}>──</span>
-							)}
-						</div>
-					))}
-				</div>
-
-				{/* Step 1 */}
-				{step === 1 && (
-					<div style={ms.body}>
-						<p style={ms.p}>
-							Acesse{" "}
-							<a
-								href="https://supabase.com"
-								target="_blank"
-								rel="noreferrer"
-								style={ms.link}>
-								supabase.com
-							</a>{" "}
-							e crie uma conta gratuita.
-						</p>
-						<div style={ms.card}>
-							{[
-								["1", "Clique em", "New Project"],
-								["2", "Nome do projeto:", "laravel-roadmap"],
-								["3", "Defina uma senha forte e anote-a", ""],
-								["4", "Região:", "South America (São Paulo)"],
-								["5", "Aguarde ~2 minutos", ""],
-							].map(([n, txt, hl]) => (
-								<div
-									key={n}
-									style={{
-										display: "flex",
-										gap: 10,
-										marginBottom: 8,
-										alignItems: "flex-start",
-									}}>
-									<span style={{ ...ms.stepNum }}>{n}</span>
-									<span style={{ fontSize: 13, color: "#888" }}>
-										{txt} {hl && <b style={{ color: "#00ff88" }}>{hl}</b>}
-									</span>
-								</div>
-							))}
-						</div>
-						<button style={ms.btn} onClick={() => setStep(2)}>
-							Projeto criado →
-						</button>
-					</div>
-				)}
-
-				{/* Step 2 */}
-				{step === 2 && (
-					<div style={ms.body}>
-						<p style={ms.p}>
-							No painel do Supabase, acesse{" "}
-							<b style={{ color: "#06b6d4" }}>SQL Editor</b> e execute o SQL
-							abaixo para criar a tabela:
-						</p>
-						<div style={ms.sqlWrap}>
-							<pre
-								style={{
-									margin: 0,
-									fontSize: 11,
-									lineHeight: 1.7,
-									color: "#00ff88",
-									whiteSpace: "pre-wrap",
-								}}>
-								{SQL}
-							</pre>
-						</div>
-						<div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-							<button style={ms.copyBtn} onClick={copySQL}>
-								{copied ? "✓ Copiado!" : "📋 Copiar SQL"}
-							</button>
-							<span
-								style={{ fontSize: 11, color: "#444", alignSelf: "center" }}>
-								depois clique em "Run" no Supabase
-							</span>
-						</div>
-						<div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-							<button style={ms.btnSec} onClick={() => setStep(1)}>
-								← Voltar
-							</button>
-							<button style={ms.btn} onClick={() => setStep(3)}>
-								Tabela criada →
-							</button>
-						</div>
-					</div>
-				)}
-
-				{/* Step 3 */}
-				{step === 3 && (
-					<div style={ms.body}>
-						<p style={ms.p}>
-							Vá em <b style={{ color: "#7c3aed" }}>Project Settings → API</b> e
-							copie os valores abaixo:
-						</p>
-						<div style={ms.field}>
-							<label style={ms.label}>Project URL</label>
-							<input
-								style={ms.input}
-								placeholder="https://xxxxxxxxxxxx.supabase.co"
-								value={url}
-								onChange={(e) => setUrl(e.target.value)}
-							/>
-						</div>
-						<div style={ms.field}>
-							<label style={ms.label}>anon / public key</label>
-							<input
-								style={ms.input}
-								placeholder="eyJhbGci..."
-								value={key}
-								onChange={(e) => setKey(e.target.value)}
-								type="password"
-							/>
-						</div>
-						<div style={ms.field}>
-							<label style={ms.label}>
-								Seu identificador único (para sincronizar entre dispositivos)
-							</label>
-							<input
-								style={ms.input}
-								placeholder="ex: meu_progresso_2026"
-								value={uid}
-								onChange={(e) => setUid(e.target.value)}
-							/>
-							<span style={{ fontSize: 11, color: "#444", marginTop: 3 }}>
-								Use o mesmo identificador em todos os seus
-								computadores/celulares.
-							</span>
-						</div>
-						{err && <div style={ms.err}>{err}</div>}
-						<div style={{ display: "flex", gap: 8 }}>
-							<button style={ms.btnSec} onClick={() => setStep(2)}>
-								← Voltar
-							</button>
-							<button
-								style={{ ...ms.btn, opacity: busy ? 0.6 : 1 }}
-								onClick={connect}
-								disabled={busy}>
-								{busy ? "Conectando..." : "⚡ Conectar e sincronizar"}
-							</button>
-						</div>
-					</div>
-				)}
-			</div>
-		</div>
-	);
-}
-
-const ms = {
-	overlay: {
-		position: "fixed",
-		inset: 0,
-		background: "rgba(0,0,0,0.88)",
-		zIndex: 200,
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "center",
-		padding: 16,
-	},
-	box: {
-		background: "#0c0c1a",
-		border: "1px solid #1a1a30",
-		borderRadius: 16,
-		padding: 28,
-		maxWidth: 540,
-		width: "100%",
-		maxHeight: "92vh",
-		overflowY: "auto",
-		display: "flex",
-		flexDirection: "column",
-		gap: 20,
-		fontFamily: "'Roboto', sans-serif",
-	},
-	hdr: {
-		display: "flex",
-		justifyContent: "space-between",
-		alignItems: "flex-start",
-		gap: 10,
-	},
-	title: {
-		fontSize: 20,
-		fontWeight: 700,
-		color: "#fff",
-		fontFamily: "'Roboto', sans-serif",
-		letterSpacing: "-0.5px",
-	},
-	sub: {
-		fontSize: 13,
-		color: "#888",
-		marginTop: 2,
-		fontFamily: "'Roboto', sans-serif",
-	},
-	closeBtn: {
-		background: "transparent",
-		border: "1px solid #1e1e2e",
-		borderRadius: 6,
-		color: "#444",
-		padding: "4px 8px",
-		cursor: "pointer",
-		fontSize: 14,
-		fontFamily: "'Roboto', sans-serif",
-		fontWeight: 500,
-	},
-	stepNav: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 },
-	dot: {
-		width: 22,
-		height: 22,
-		borderRadius: "50%",
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "center",
-		fontSize: 11,
-		fontWeight: 600,
-		flexShrink: 0,
-		fontFamily: "'Roboto', sans-serif",
-	},
-	body: { display: "flex", flexDirection: "column", gap: 14 },
-	p: {
-		fontSize: 13,
-		color: "#999",
-		lineHeight: 1.6,
-		fontFamily: "'Roboto', sans-serif",
-		fontWeight: 400,
-	},
-	card: {
-		background: "#070710",
-		border: "1px solid #111",
-		borderRadius: 10,
-		padding: "14px 16px",
-	},
-	stepNum: {
-		background: "#1e1e2e",
-		color: "#00ff88",
-		width: 20,
-		height: 20,
-		borderRadius: "50%",
-		display: "inline-flex",
-		alignItems: "center",
-		justifyContent: "center",
-		fontSize: 10,
-		fontWeight: 700,
-		flexShrink: 0,
-		fontFamily: "'Roboto', sans-serif",
-	},
-	sqlWrap: {
-		background: "#070710",
-		border: "1px solid #1a1a2e",
-		borderRadius: 10,
-		padding: "14px 16px",
-		maxHeight: 180,
-		overflowY: "auto",
-		fontFamily: "'Roboto Mono', monospace",
-	},
-	copyBtn: {
-		fontSize: 12,
-		padding: "6px 12px",
-		background: "#00ff8812",
-		border: "1px solid #00ff8825",
-		borderRadius: 6,
-		color: "#00ff88",
-		cursor: "pointer",
-		fontFamily: "'Roboto', sans-serif",
-		fontWeight: 600,
-	},
-	field: { display: "flex", flexDirection: "column", gap: 4 },
-	label: {
-		fontSize: 11,
-		color: "#666",
-		fontFamily: "'Roboto Mono', monospace",
-		letterSpacing: "0.05em",
-		textTransform: "uppercase",
-		fontWeight: 600,
-	},
-	input: {
-		background: "#070710",
-		border: "1px solid #1e1e3a",
-		borderRadius: 8,
-		padding: "10px 12px",
-		color: "#ddd",
-		fontSize: 14,
-		fontFamily: "'Roboto', sans-serif",
-		outline: "none",
-		width: "100%",
-	},
-	btn: {
-		flex: 1,
-		background: "#00ff88",
-		color: "#000",
-		border: "none",
-		borderRadius: 8,
-		padding: "11px 20px",
-		fontSize: 14,
-		fontWeight: 700,
-		cursor: "pointer",
-		fontFamily: "'Roboto', sans-serif",
-	},
-	btnSec: {
-		background: "transparent",
-		color: "#888",
-		border: "1px solid #1e1e2e",
-		borderRadius: 8,
-		padding: "11px 16px",
-		fontSize: 14,
-		cursor: "pointer",
-		fontFamily: "'Roboto', sans-serif",
-		fontWeight: 500,
-	},
-	link: { color: "#00ff88" },
-	err: {
-		background: "#ef444415",
-		border: "1px solid #ef444430",
-		borderRadius: 8,
-		padding: "9px 12px",
-		color: "#ef4444",
-		fontSize: 13,
-		fontFamily: "'Roboto', sans-serif",
-		fontWeight: 500,
-	},
-};
-
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
 	const [checked, setChecked] = useState({});
 	const [expanded, setExpanded] = useState("m1");
 	const [loaded, setLoaded] = useState(false);
 	const [status, setStatus] = useState("idle"); // idle | saving | synced | error
-	const [dbConfig, setDbConfig] = useState(null);
-	const [showSetup, setShowSetup] = useState(false);
 	const clientRef = useRef(null);
 	const timer = useRef(null);
 
 	useEffect(() => {
 		(async () => {
-			let cfg = null;
-			try {
-				const r = await window.storage.get("sb_cfg");
-				if (r?.value) cfg = JSON.parse(r.value);
-			} catch (_) {}
-			if (cfg) {
-				setDbConfig(cfg);
-				clientRef.current = makeClient(cfg.url, cfg.key);
+			// Inicializa cliente Supabase a partir do .env
+			if (DB_CONFIG.url && DB_CONFIG.key) {
+				clientRef.current = makeClient(DB_CONFIG.url, DB_CONFIG.key);
 				try {
-					const prog = await clientRef.current.load(cfg.userId);
+					const prog = await clientRef.current.load(DB_CONFIG.userId);
 					setChecked(prog);
 					setStatus("synced");
 					setTimeout(() => setStatus("idle"), 2000);
 				} catch (_) {
-					// fallback to local
-					try {
-						const r = await window.storage.get("progress");
-						if (r?.value) setChecked(JSON.parse(r.value));
-					} catch (_) {}
+					// fallback para localStorage
+					const saved = localStorage.getItem("progress");
+					if (saved) setChecked(JSON.parse(saved));
 					setStatus("error");
 				}
 			} else {
-				try {
-					const r = await window.storage.get("progress");
-					if (r?.value) setChecked(JSON.parse(r.value));
-				} catch (_) {}
+				// Sem Supabase configurado — usa só localStorage
+				const saved = localStorage.getItem("progress");
+				if (saved) setChecked(JSON.parse(saved));
 			}
 			setLoaded(true);
 		})();
 	}, []);
 
-	const persist = useCallback(
-		async (next) => {
+	const persist = useCallback(async (next) => {
+		// Salva localmente sempre (fallback)
+		localStorage.setItem("progress", JSON.stringify(next));
+		// Salva no Supabase se configurado
+		if (!clientRef.current) return;
+		setStatus("saving");
+		clearTimeout(timer.current);
+		timer.current = setTimeout(async () => {
 			try {
-				await window.storage.set("progress", JSON.stringify(next));
-			} catch (_) {}
-			if (!clientRef.current || !dbConfig) return;
-			setStatus("saving");
-			clearTimeout(timer.current);
-			timer.current = setTimeout(async () => {
-				try {
-					await clientRef.current.save(dbConfig.userId, next);
-					setStatus("synced");
-					setTimeout(() => setStatus("idle"), 2000);
-				} catch (_) {
-					setStatus("error");
-				}
-			}, 700);
-		},
-		[dbConfig],
-	);
-
-	async function handleConnect(cfg) {
-		try {
-			await window.storage.set("sb_cfg", JSON.stringify(cfg));
-		} catch (_) {}
-		clientRef.current = makeClient(cfg.url, cfg.key);
-		setDbConfig(cfg);
-		setShowSetup(false);
-		setStatus("synced");
-		setTimeout(() => setStatus("idle"), 2000);
-	}
-
-	function handleDisconnect() {
-		clientRef.current = null;
-		setDbConfig(null);
-		try {
-			window.storage.delete("sb_cfg");
-		} catch (_) {}
-		setStatus("idle");
-	}
+				await clientRef.current.save(DB_CONFIG.userId, next);
+				setStatus("synced");
+				setTimeout(() => setStatus("idle"), 2000);
+			} catch (_) {
+				setStatus("error");
+			}
+		}, 700);
+	}, []);
 
 	function toggle(id) {
 		const next = { ...checked, [id]: !checked[id] };
@@ -981,7 +538,7 @@ export default function App() {
 		idle: (
 			<>
 				<span style={{ color: "#2a2a3a" }}>●</span>
-				{dbConfig ? " supabase ativo" : " salvo localmente"}
+				{clientRef.current ? " supabase ativo" : " salvo localmente"}
 			</>
 		),
 		saving: (
@@ -1057,15 +614,7 @@ export default function App() {
         input:focus{outline:2px solid #00ff8830!important;border-color:#00ff8840!important}
       `}</style>
 
-			{showSetup && (
-				<SetupModal
-					currentChecked={checked}
-					onConnect={handleConnect}
-					onClose={() => setShowSetup(false)}
-				/>
-			)}
-
-			{/* ── Header ── */}
+				{/* ── Header ── */}
 			<header style={a.header}>
 				<div style={a.hInner}>
 					<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1077,36 +626,14 @@ export default function App() {
 							<div style={a.hSub}>{">"} meta: emprego back-end PHP · 2026</div>
 						</div>
 					</div>
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 10,
-							flexWrap: "wrap",
-						}}>
+					<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
 						<span style={a.statusTxt}>{statusUI}</span>
-						{dbConfig ? (
-							<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-								<div style={a.dbBadge}>
-									<span style={{ color: "#00ff88" }}>⚡</span> supabase{" "}
-									<span style={{ color: "#00ff88" }}>·</span>{" "}
-									<span style={{ color: "#444" }}>{dbConfig.userId}</span>
-								</div>
-								<button
-									className="dis-btn"
-									style={a.disBtn}
-									onClick={handleDisconnect}
-									title="Desconectar">
-									✕
-								</button>
+						{clientRef.current && (
+							<div style={a.dbBadge}>
+								<span style={{ color: "#00ff88" }}>⚡</span> supabase{" "}
+								<span style={{ color: "#333" }}>·</span>{" "}
+								<span style={{ color: "#444" }}>{DB_CONFIG.userId}</span>
 							</div>
-						) : (
-							<button
-								className="sb-btn"
-								style={a.sbBtn}
-								onClick={() => setShowSetup(true)}>
-								⚡ Conectar Supabase
-							</button>
 						)}
 					</div>
 				</div>
@@ -1509,10 +1036,9 @@ export default function App() {
 							color: "#1e1e2e",
 							fontFamily: "'Roboto Mono',monospace",
 						}}>
-						//{" "}
-						{dbConfig
-							? `sincronizando com supabase · id: ${dbConfig.userId}`
-							: "configure o supabase para sincronizar entre dispositivos"}
+						/{clientRef.current
+							? `// sincronizando com supabase · id: ${DB_CONFIG.userId}`
+							: "// sem supabase — usando localStorage"}
 					</div>
 				</div>
 			</main>
