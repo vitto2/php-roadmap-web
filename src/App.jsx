@@ -497,6 +497,25 @@ export default function App() {
 		})();
 	}, []);
 
+	// ── Polling em tempo real (a cada 5 segundos) ────────────────────────────
+	useEffect(() => {
+		if (!clientRef.current) return;
+
+		const interval = setInterval(async () => {
+			try {
+				const remote = await clientRef.current.load(DB_CONFIG.userId);
+				setChecked((prev) => {
+					// Só atualiza se o conteúdo for diferente do que já está na tela
+					const remoteStr = JSON.stringify(remote);
+					const localStr = JSON.stringify(prev);
+					return remoteStr !== localStr ? remote : prev;
+				});
+			} catch (_) {}
+		}, 5000);
+
+		return () => clearInterval(interval);
+	}, [loaded]);
+
 	const persist = useCallback(async (next) => {
 		// Salva localmente sempre (fallback)
 		localStorage.setItem("progress", JSON.stringify(next));
@@ -614,7 +633,7 @@ export default function App() {
         input:focus{outline:2px solid #00ff8830!important;border-color:#00ff8840!important}
       `}</style>
 
-				{/* ── Header ── */}
+			{/* ── Header ── */}
 			<header style={a.header}>
 				<div style={a.hInner}>
 					<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -626,7 +645,13 @@ export default function App() {
 							<div style={a.hSub}>{">"} meta: emprego back-end PHP · 2026</div>
 						</div>
 					</div>
-					<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+					<div
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 10,
+							flexWrap: "wrap",
+						}}>
 						<span style={a.statusTxt}>{statusUI}</span>
 						{clientRef.current && (
 							<div style={a.dbBadge}>
@@ -1036,7 +1061,8 @@ export default function App() {
 							color: "#1e1e2e",
 							fontFamily: "'Roboto Mono',monospace",
 						}}>
-						/{clientRef.current
+						/
+						{clientRef.current
 							? `// sincronizando com supabase · id: ${DB_CONFIG.userId}`
 							: "// sem supabase — usando localStorage"}
 					</div>
